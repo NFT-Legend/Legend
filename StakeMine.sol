@@ -4,9 +4,10 @@ pragma solidity ^0.8.0;
 
 import "./include/IERC20.sol";
 import "./lib/MultiStakeBase.sol";
+import "./lib/ReentrancyGuard.sol";
 
-contract StakeMine is MultiStakeBase {
-    function staking(int256 amount) external payable {
+contract StakeMine is MultiStakeBase, ReentrancyGuard {
+    function staking(int256 amount) external nonReentrant payable {
         if (amount > 0) {
             require(msg.value == uint256(amount), "invalid msg.value");
         } else {
@@ -16,9 +17,15 @@ contract StakeMine is MultiStakeBase {
         _staking(address(0), msg.sender, amount);
     }
 
-    function staking(address poolAddr, int256 amount) external {
+    function staking(
+        address poolAddr,
+        address tokenAddr,
+        int256 amount
+    ) external nonReentrant {
+        Pool storage pool = pools[poolAddr];
+        require(pool.token == tokenAddr, "Invalid tokenAddr");
         bool success;
-        IERC20 token = IERC20(poolAddr);
+        IERC20 token = IERC20(tokenAddr);
         if (amount > 0) {
             success = token.transferFrom(msg.sender, address(this), uint256(amount));
         } else {

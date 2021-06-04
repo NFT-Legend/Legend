@@ -25,11 +25,11 @@ contract BonusPool is Permission, IBonusPool, IPeriod, IERC1155TokenReceiver, IE
     // 当前期未领取奖金
     uint256 public override current;
     // 当前期号
-    uint32 public override number;
+    uint32 public override number = 1;
     // 返奖比例
     uint32 public override rebateRatio = 20;
     // 返奖周期
-    uint32 public override bonusDuration = 10 * 24 * 3600;
+    uint32 public override bonusDuration = 7 * 24 * 3600;
     // 每碎片Token数量(不包含精度信息，计算时必须带入精度)
     uint256 public override perFragmentToken = 50;
     // 返奖期列表
@@ -62,6 +62,16 @@ contract BonusPool is Permission, IBonusPool, IPeriod, IERC1155TokenReceiver, IE
     }
     AwardsInfo[] public awardsInfos;
 
+    function setParams(
+        uint256 rate,
+        uint256 duartion,
+        uint256 perToken
+    ) public CheckPermit("admin") {
+        rebateRatio = uint32(rate);
+        bonusDuration = uint32(duartion);
+        perFragmentToken = perToken;
+    }
+
     function getInfo()
         public
         view
@@ -88,7 +98,7 @@ contract BonusPool is Permission, IBonusPool, IPeriod, IERC1155TokenReceiver, IE
         for (uint256 i = 0; i != awardsInfos.length; i++) {
             ratio += awardsInfos[i].ratio;
         }
-        require(awardsInfo.ratio > 0 && awardsInfo.ratio <= 100 - ratio, "Invalid ratio");
+        require(awardsInfo.ratio <= 100 - ratio, "Invalid ratio");
         if (index < awardsInfos.length) {
             awardsInfos[index] = awardsInfo;
         } else {
@@ -100,13 +110,13 @@ contract BonusPool is Permission, IBonusPool, IPeriod, IERC1155TokenReceiver, IE
         Period storage period = periods[number];
         uint256 length;
         for (uint256 i = 0; i != period.awardsInfos.length; i++) {
-            if (period.awardsInfos[i].lastFragmentCount > 1) length += 1;
+            if (period.awardsInfos[i].lastFragmentCount >= 1) length += 1;
         }
         if (length > 0) {
             fragmentInfos = new FragmentInfo[](length);
             uint256 j = 0;
             for (uint256 i = 0; i != period.awardsInfos.length; i++) {
-                if (period.awardsInfos[i].lastFragmentCount > 1) {
+                if (period.awardsInfos[i].lastFragmentCount >= 1) {
                     fragmentInfos[j] = FragmentInfo(uint8(FragmentType.BonusPool), uint64(period.awardsInfos[i].types), number, period.awardsInfos[i].lastFragmentCount, perFragmentToken);
                     j++;
                 }
@@ -129,7 +139,7 @@ contract BonusPool is Permission, IBonusPool, IPeriod, IERC1155TokenReceiver, IE
     }
 
     function injectCapital(uint256 value) external override {
-        if (msg.sender != getAddress("Store")) {
+        if (msg.sender != getAddress("Store") && msg.sender != getAddress("PreSale")) {
             IERC20 token = _getTokenContract();
             bool success = token.transferFrom(msg.sender, address(this), value);
             require(success, "Payment failed");
@@ -137,14 +147,20 @@ contract BonusPool is Permission, IBonusPool, IPeriod, IERC1155TokenReceiver, IE
         total += value;
     }
 
-    function open() external CheckPermit("admin") {
+    function open(uint256 award) external CheckPermit("admin") {
         uint256 start = block.timestamp;
         require(start >= periods[number].endTime, "start must be greater than or equal to endTime");
         if (current > 0) total += current;
         uint256 end = start + bonusDuration;
         number += 1;
-        current = (total * uint256(rebateRatio)) / 100;
-        total -= current;
+        if (award > 0) {
+            current = award;
+            total = 0;
+        } else {
+            current = (total * uint256(rebateRatio)) / 100;
+            total -= current;
+        }
+
         Period storage period = periods[number];
         period.startTime = uint64(start);
         period.endTime = uint64(end);

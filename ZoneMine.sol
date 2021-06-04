@@ -376,7 +376,7 @@ contract ZoneMine is Permission, IERC1155TokenReceiver {
         roleContract.stopWorking(msg.sender, uint32(zoneInfo.baseExp * bonusTimes));
 
         //退还消耗品
-        if (burnTokens > 0) {
+        if (allTokens - burnTokens > 0) {
             IERC1155(fragmentAddr).safeTransferFrom(address(this), msg.sender, fragmentId, allTokens - burnTokens, abi.encodePacked("Return items"));
         }
         //销毁矿镐

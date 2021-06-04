@@ -9,8 +9,9 @@ import "./include/IERC1363Receiver.sol";
 import "./include/IERC1363Spender.sol";
 import "./include/IERC1363.sol";
 import "./lib/Address.sol";
+import "./lib/ReentrancyGuard.sol";
 
-contract LGC is ERC20, Permission, IERC20OP, IERC165, IERC1363 {
+contract LGC is ReentrancyGuard, ERC20, Permission, IERC20OP, IERC165, IERC1363 {
     using Address for address;
 
     //团队份额
@@ -123,7 +124,7 @@ contract LGC is ERC20, Permission, IERC20OP, IERC165, IERC1363 {
         address recipient,
         uint256 amount,
         bytes memory data
-    ) internal virtual returns (bool) {
+    ) internal nonReentrant virtual returns (bool) {
         if (!recipient.isContract()) {
             return false;
         }
@@ -135,7 +136,7 @@ contract LGC is ERC20, Permission, IERC20OP, IERC165, IERC1363 {
         address spender,
         uint256 amount,
         bytes memory data
-    ) internal virtual returns (bool) {
+    ) internal nonReentrant virtual returns (bool) {
         if (!spender.isContract()) {
             return false;
         }

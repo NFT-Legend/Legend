@@ -76,7 +76,7 @@ abstract contract ERC1155 is IERC1155, IERC165, IERC1155Metadata {
         uint256 _id,
         uint256 _value,
         bytes calldata _data
-    ) external override {
+    ) public override virtual {
         require(_to != address(0x0), "_to must be non-zero.");
         require(_from == msg.sender || operatorApproval[_from][msg.sender] == true, "Need operator approval for 3rd party transfers.");
 
@@ -119,7 +119,7 @@ abstract contract ERC1155 is IERC1155, IERC165, IERC1155Metadata {
         uint256[] calldata _ids,
         uint256[] calldata _values,
         bytes calldata _data
-    ) external override {
+    ) public override virtual {
         // MUST Throw on errors
         require(_to != address(0x0), "destination address must be non-zero.");
         require(_ids.length == _values.length, "_ids and _values array length must match.");
@@ -171,7 +171,7 @@ abstract contract ERC1155 is IERC1155, IERC165, IERC1155Metadata {
         @param _ids    ID of the Tokens
         @return        The _owner's balance of the Token types requested (i.e. balance for each (owner, id) pair)
      */
-    function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids) external view override returns (uint256[] memory) {
+    function balanceOfBatch(address[] calldata _owners, uint256[] calldata _ids) public view override returns (uint256[] memory) {
         require(_owners.length == _ids.length);
 
         uint256[] memory balances_ = new uint256[](_owners.length);
@@ -189,7 +189,7 @@ abstract contract ERC1155 is IERC1155, IERC165, IERC1155Metadata {
         @param _operator  Address to add to the set of authorized operators
         @param _approved  True if the operator is approved, false to revoke approval
     */
-    function setApprovalForAll(address _operator, bool _approved) external override {
+    function setApprovalForAll(address _operator, bool _approved) public override {
         operatorApproval[msg.sender][_operator] = _approved;
         emit ApprovalForAll(msg.sender, _operator, _approved);
     }
@@ -200,7 +200,7 @@ abstract contract ERC1155 is IERC1155, IERC165, IERC1155Metadata {
         @param _operator  Address of authorized operator
         @return           True if the operator is approved, false if not
     */
-    function isApprovedForAll(address _owner, address _operator) external view override returns (bool) {
+    function isApprovedForAll(address _owner, address _operator) public view override returns (bool) {
         return operatorApproval[_owner][_operator];
     }
 

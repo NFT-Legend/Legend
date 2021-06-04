@@ -58,7 +58,7 @@ contract Fragment is ERC1155, Permission, IERC1155OP, ILockTokens, IStoreOP {
         uint256 tokenId,
         uint256 amount,
         uint256 perTokens
-    ) external override CheckPermit("zoneMine") {
+    ) public override CheckPermit("zoneMine") {
         lockTokens[tokenId] = perTokens;
         totalSupply[tokenId] += amount;
         _addTokenTo(to, tokenId, amount);
@@ -79,7 +79,7 @@ contract Fragment is ERC1155, Permission, IERC1155OP, ILockTokens, IStoreOP {
         address to,
         uint256 quantity,
         bytes calldata data
-    ) external override CheckPermit("store") {
+    ) public override CheckPermit("store") {
         require(data.length == 41, "Invalid data");
         uint8 bigType = Utils.toUint8(data, 0);
         uint64 smallType = Utils.toUint64(data, 1);
@@ -93,14 +93,7 @@ contract Fragment is ERC1155, Permission, IERC1155OP, ILockTokens, IStoreOP {
         emit TransferSingle(address(0), address(0), to, tokenId, quantity);
     }
 
-    function burn(
-        address from,
-        uint256 tokenId,
-        uint256 amount
-    ) external override {
-        require(from == msg.sender || operatorApproval[from][msg.sender] == true, "Need operator approval for 3rd party burn.");
-        totalSupply[tokenId] -= amount;
-        _removeTokenFrom(from, tokenId, amount);
+    function _removeIdsFrom(address from, uint256 tokenId) private {
         if (balances[tokenId][from] == 0) {
             uint256 index;
             uint256[] storage tokenIds = ownerTokens[from];
@@ -119,6 +112,44 @@ contract Fragment is ERC1155, Permission, IERC1155OP, ILockTokens, IStoreOP {
                 delete ownerTokens[from];
             }
         }
+    }
+
+    function burn(
+        address from,
+        uint256 tokenId,
+        uint256 amount
+    ) public override {
+        require(from == msg.sender || operatorApproval[from][msg.sender] == true, "Need operator approval for 3rd party burn.");
+        totalSupply[tokenId] -= amount;
+        _removeTokenFrom(from, tokenId, amount);
+        _removeIdsFrom(from, tokenId);
         emit TransferSingle(msg.sender, from, address(0), tokenId, amount);
+    }
+
+    function safeTransferFrom(
+        address _from,
+        address _to,
+        uint256 _id,
+        uint256 _value,
+        bytes calldata _data
+    ) public virtual override {
+        super.safeTransferFrom(_from, _to, _id, _value, _data);
+        _removeIdsFrom(_from, _id);
+        _addToIds(_id, _to);
+    }
+
+    function safeBatchTransferFrom(
+        address _from,
+        address _to,
+        uint256[] calldata _ids,
+        uint256[] calldata _values,
+        bytes calldata _data
+    ) public virtual override {
+        super.safeBatchTransferFrom(_from, _to, _ids, _values, _data);
+        for (uint256 i = 0; i < _ids.length; ++i) {
+            uint256 id = _ids[i];
+            _removeIdsFrom(_from, id);
+            _addToIds(id, _to);
+        }
     }
 }

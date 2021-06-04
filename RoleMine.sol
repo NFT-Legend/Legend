@@ -13,6 +13,8 @@ contract RoleMine is MultiStakeBase, IERC1155TokenReceiver {
     //鹤嘴锄id
     uint256 internal constant fragmentId = (uint256(3) << 248) | (uint256(1) << 184);
 
+    uint256 public roleCount;
+
     event InMine(address indexed user, uint256 indexed roleId);
     event StopMine(address indexed user, uint256 indexed roleId, uint256 power, uint256 reward);
 
@@ -29,6 +31,7 @@ contract RoleMine is MultiStakeBase, IERC1155TokenReceiver {
 
             roleContract.inMine(_from, time);
             _staking(address(0), _from, int32(attrs.power));
+            roleCount++;
             emit InMine(_from, hero.tokenId);
         }
     }
@@ -48,7 +51,7 @@ contract RoleMine is MultiStakeBase, IERC1155TokenReceiver {
             endTime = block.timestamp;
             //处理是否退还矿镐
             burnTokens = ((endTime - hero.startTime) / 3600) + (((endTime - hero.startTime) % 3600) > 0 ? 1 : 0);
-            if (burnTokens > 0) {
+            if (hero.time - burnTokens > 0) {
                 IERC1155(fragmentAddr).safeTransferFrom(address(this), msg.sender, fragmentId, hero.time - burnTokens, abi.encodePacked("Return items"));
             }
         }
@@ -56,9 +59,11 @@ contract RoleMine is MultiStakeBase, IERC1155TokenReceiver {
         IERC1155OP(fragmentAddr).burn(address(this), fragmentId, burnTokens);
         uint256 reward = _withdraw(address(0), endTime);
         //退出战力
-        _staking(address(0), msg.sender, -int32(attrs.power));
+        MineInfo memory mineInfo = getMineInfo(address(0), msg.sender);
+        _staking(address(0), msg.sender, -(mineInfo.stakingAmounts));
         //发放挖矿收益
         IERC20(getAddress("Token")).transfer(msg.sender, reward);
+        roleCount--;
         emit StopMine(msg.sender, hero.tokenId, attrs.power, reward);
     }
 

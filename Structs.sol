@@ -50,7 +50,9 @@ enum Operate {
     //创建角色
     CreateHero,
     //买道具
-    BuyProps
+    BuyProps,
+    //赠送
+    Handsel
 }
 
 //创建英雄的Token配置

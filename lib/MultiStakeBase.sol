@@ -7,6 +7,7 @@ import "./Permission.sol";
 
 abstract contract MultiStakeBase is Permission {
     struct Pool {
+        address token;
         uint64 startTime;
         uint64 duration;
         uint256 totalReward;
@@ -27,10 +28,11 @@ abstract contract MultiStakeBase is Permission {
         int256 stakingAdjusts;
     }
 
-    mapping(address => Pool) private pools;
+    mapping(address => Pool) internal pools;
 
     function addPool(
         address _poolAddr,
+        address _token,
         uint64 _startTime,
         uint64 _duration,
         uint256 _reward
@@ -42,6 +44,7 @@ abstract contract MultiStakeBase is Permission {
         pool.duration = _duration;
         pool.totalReward = _reward;
         pool.stakingMax = 10**30;
+        pool.token = _token;
     }
 
     function deletePool(address poolAddr) external CheckPermit("admin") {
@@ -58,7 +61,7 @@ abstract contract MultiStakeBase is Permission {
         pools[pool].stakingMax = max;
     }
 
-    function getMineInfo(address poolAddr, address owner) external view returns (MineInfo memory mineInfo) {
+    function getMineInfo(address poolAddr, address owner) public view returns (MineInfo memory mineInfo) {
         if (pools[poolAddr].startTime > 0) {
             Pool storage pool = pools[poolAddr];
             mineInfo.stakingAmounts = pool.stakingAmounts[owner];
@@ -124,10 +127,11 @@ abstract contract MultiStakeBase is Permission {
 
     function _withdraw(address poolAddr, uint256 endTime) internal returns (uint256) {
         int256 reward = calcReward(poolAddr, msg.sender, endTime);
-        require(reward > 0, "no reward");
-
-        pools[poolAddr].stakingAdjusts[msg.sender] += reward;
-        return uint256(reward);
+        if (reward > 0) {
+            pools[poolAddr].stakingAdjusts[msg.sender] += reward;
+            return uint256(reward);
+        }
+        return uint256(0);
     }
 
     function stopStaking(address poolAddr) external CheckPermit("admin") {

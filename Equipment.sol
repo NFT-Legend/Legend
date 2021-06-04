@@ -12,8 +12,10 @@ import "./include/IConfig.sol";
 import "./include/IEquipment.sol";
 import "./include/IRandom.sol";
 import "./lib/Utils.sol";
+import "./include/IFriend.sol";
+import "./include/IERC1363Receiver.sol";
 
-contract Equipment is ERC721, Permission, IEquipment {
+contract Equipment is ERC721, Permission, IEquipment, IERC1363Receiver {
     using Uinteger for uint256;
 
     /***********event ***********/
@@ -65,7 +67,7 @@ contract Equipment is ERC721, Permission, IEquipment {
         return (tokenId, equipments[tokenId]);
     }
 
-    function mint(address to, EquipmentAttr memory attr) external override CheckPermit2(["zoneMine", "box"]) {
+    function mint(address to, EquipmentAttr memory attr) public override CheckPermit2(["zoneMine", "box"]) {
         uint256 eId = (uint256(attr.profession) << 248) | (uint256(attr.category) << 240) | (uint256(attr.quality) << 232) | (uint256(uint64(block.timestamp)) << 64) | uint64(totalSupply + 1);
         _mint(to, eId);
         equipments[eId] = attr;
@@ -110,7 +112,7 @@ contract Equipment is ERC721, Permission, IEquipment {
         uint32 level,
         uint256[] calldata newIds,
         uint256[] calldata oldIds
-    ) external override returns (uint32 power) {
+    ) public override returns (uint32 power) {
         require(msg.sender == getAddress("Role"), "operator must be Role");
         //卸下之前的装备
         for (uint256 i = 0; i != oldIds.length; i++) {
@@ -135,7 +137,7 @@ contract Equipment is ERC721, Permission, IEquipment {
         @param baseId 被强化的装备id
         @param consumeIds 消耗的装备id组
      */
-    function increase(uint256 baseId, uint256[] memory consumeIds) external {
+    function increase(uint256 baseId, uint256[] memory consumeIds) public {
         require(consumeIds.length > 0 && consumeIds.length <= 10, "consumeIds.length must be less than or equal to 10");
         address baseOwner = tokenOwners[baseId];
         require(msg.sender == baseOwner || msg.sender == tokenApprovals[baseId] || approvalForAlls[baseOwner][msg.sender], "msg.sender must be owner or approved");
@@ -212,5 +214,66 @@ contract Equipment is ERC721, Permission, IEquipment {
             base.power = config.calcPower(base.level, base.mainAttrs);
             base.tokens += consume.tokens;
         }
+    }
+
+    /**
+    @notice 赠送
+    @param from 发送装备的地址
+    @param to 接收装备的地址
+    @param ids 要赠送的装备id
+    */
+    function handsel(
+        address from,
+        address to,
+        uint256[] memory ids
+    ) internal {
+        bool isFriend = IFriend(getAddress("Friend")).contains(from, to);
+        require(true == isFriend, "Can only be given to friends");
+        for (uint256 i = 0; i != ids.length; i++) {
+            _handsel(from, to, ids[i]);
+        }
+    }
+
+    function _handsel(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal {
+        require(from != address(0), "from is zero address");
+        require(to != address(0), "to is zero address");
+        require(equipments[tokenId].locked == false, "This equipment is locked");
+        require(equipments[tokenId].isEquip == false, "This equipment is already equipped");
+        require(from == tokenOwners[tokenId], "from must be owner");
+        if (tokenApprovals[tokenId] != address(0)) {
+            delete tokenApprovals[tokenId];
+        }
+        _removeTokenFrom(from, tokenId);
+        _addTokenTo(to, tokenId);
+        emit Transfer(from, to, tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+        return interfaceId == type(IERC1363Receiver).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    function onTransferReceived(
+        address,
+        address from,
+        uint256 value,
+        bytes calldata data
+    ) public override returns (bytes4) {
+        if (msg.sender == getAddress("Token")) {
+            (uint256 _op, address to, uint256[] memory ids) = abi.decode(data, (uint256, address, uint256[]));
+            Operate op = Operate(uint8(_op));
+            if (Operate.Handsel == op) {
+                //验证金额
+                require(value >= IFriend(getAddress("Friend")).getHandselFee() * ids.length, "Invalid value");
+                //赠送
+                handsel(from, to, ids);
+            } else {
+                return 0;
+            }
+        }
+        return IERC1363Receiver(this).onTransferReceived.selector;
     }
 }

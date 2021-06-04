@@ -33,6 +33,10 @@ contract Store is Permission, IERC1363Receiver, IERC165 {
     //收费比例
     uint256 public chargeRatio = 20;
 
+    function setChargeRatio(uint256 rate) public CheckPermit("admin") {
+        chargeRatio = rate;
+    }
+
     function addGoods(GoodsInfo calldata goodsInfo, uint256 goodsId) external CheckPermit("admin") {
         require(goodsId > 0, "Invalid goodsId");
         goods[goodsId] = goodsInfo;
@@ -43,7 +47,7 @@ contract Store is Permission, IERC1363Receiver, IERC165 {
         delete goods[goodsId];
     }
 
-    function buy(uint256 goodsId, uint256 quantity) public {
+    function buy(uint256 goodsId, uint256 quantity) public virtual {
         require(quantity <= goods[goodsId].quantityCount - goods[goodsId].quantitySold, "Invalid quantity");
         address tokenAddress = goods[goodsId].settlementCurrency;
         IERC20 token = IERC20(tokenAddress);
@@ -82,7 +86,7 @@ contract Store is Permission, IERC1363Receiver, IERC165 {
         uint256 value,
         address tokenAddr,
         bytes calldata data
-    ) internal {
+    ) internal virtual {
         uint256 goodsId = Utils.toUint256(data, 1);
         uint256 quantity = Utils.toUint256(data, 33);
         require(quantity <= goods[goodsId].quantityCount - goods[goodsId].quantitySold, "Invalid quantity");
